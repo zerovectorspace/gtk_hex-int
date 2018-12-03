@@ -29,6 +29,7 @@ import Control.Monad.Trans
 
 data HexOrInt = H | I
 
+keyPressed :: (LabelClass a) => a -> IORef HexOrInt -> EventM EKey Bool
 keyPressed lbl ref = tryEvent $ do
   kn <- eventKeyName
   hori <- liftIO $ readIORef ref
@@ -39,6 +40,8 @@ keyPressed lbl ref = tryEvent $ do
                      I -> str ++ ": " ++ (show . ord . head $ str)
                    ]
 
+radHexPressed :: (ToggleButtonClass a, ToggleButtonClass b)
+              => a -> b -> IORef HexOrInt -> EventM c Bool
 radHexPressed radHex radInt ref = tryEvent . liftIO $ do
   hori <- readIORef ref
   toggleButtonSetActive radHex True
@@ -47,6 +50,8 @@ radHexPressed radHex radInt ref = tryEvent . liftIO $ do
     H -> writeIORef ref I
     I -> writeIORef ref H
 
+radIntPressed :: (ToggleButtonClass a, ToggleButtonClass b)
+              => a -> b -> IORef HexOrInt -> EventM c Bool
 radIntPressed radHex radInt ref = tryEvent . liftIO $ do
   hori <- readIORef ref
   toggleButtonSetActive radHex False
@@ -55,6 +60,7 @@ radIntPressed radHex radInt ref = tryEvent . liftIO $ do
     H -> writeIORef ref I
     I -> writeIORef ref H
 
+main :: IO ()
 main = do
   -- RadioButton State
   hexOrInt <- newIORef H
