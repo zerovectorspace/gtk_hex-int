@@ -1,3 +1,6 @@
 *.hi
 *.o
 out
+*.cabal
+.stack-work
+stack.yaml

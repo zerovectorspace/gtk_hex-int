@@ -1,0 +1,31 @@
+name:                gtkHexInt
+version:             0.1.0.0
+license:             GPL3
+author:              "z y"
+maintainer:          "zachary_young@zerovector.space"
+copyright:           "Copyright 2018 Zachary Young"
+
+extra-source-files:
+- README.md
+
+dependencies:
+- base >= 4.7 && < 5
+- hex
+- gtk3
+- glib
+- mtl
+
+library:
+  source-dirs: src
+
+executables:
+  main-exe:
+    main:                main.hs
+    source-dirs:         src
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -fmax-errors=1
+    dependencies:
+    - gtkHexInt
