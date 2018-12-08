@@ -53,9 +53,9 @@ data Env = Env { hib  :: TVar BaseConv
 
 type App = ReaderT Env IO ()
 
-setConv :: Env -> BaseConv -> IO ()
-setConv env val =
-  atomically . writeTVar (hib env) $ val
+setConv :: TVar BaseConv -> BaseConv -> IO ()
+setConv hib val =
+  atomically . writeTVar hib $ val
 
 buildEnv :: IO Env
 buildEnv = 
@@ -70,7 +70,9 @@ buildEnv =
   >>= \hori   -> return $ Env hori (rbHex,rbInt,rbBin) label window
 
 handleEvents :: App 
-handleEvents = ask >>= \env@(Env hori (rbHex,rbInt,rbBin) label window ) -> liftIO $ do
+handleEvents = ask >>=
+  \env@( Env hib (rbHex,rbInt,rbBin) label window ) -> liftIO $ do
+
   -- Window
   on window objectDestroy mainQuit
   on window deleteEvent $ tryEvent . liftIO $ mainQuit
@@ -79,31 +81,31 @@ handleEvents = ask >>= \env@(Env hori (rbHex,rbInt,rbBin) label window ) -> lift
   on rbHex buttonReleaseEvent $ tryEvent . liftIO $ do
     putStrLn "rbHex clicked"
     toggleButtonSetActive rbHex True
-    setConv env H
+    setConv hib H
 
   -- Radio Button
   on rbInt buttonReleaseEvent $ tryEvent . liftIO $ do
     putStrLn "rbInt clicked"
     toggleButtonSetActive rbInt True
-    setConv env I
+    setConv hib I
 
   -- Radio Button
   on rbBin buttonReleaseEvent $ tryEvent . liftIO $ do
     putStrLn "rbBin clicked"
     toggleButtonSetActive rbBin True
-    setConv env B
+    setConv hib B
 
   -- Keyboard 
   on window keyPressEvent $ do
     kn  <- eventKeyName
     tryEvent . liftIO $ do
       putStrLn $ "key: " ++ glibToString kn
-      hib <- readTVarIO (hib env)
+      hib <- readTVarIO hib
       case glibToString kn of
         "Return" -> mainQuit
         "Escape" -> mainQuit
         str      -> when (length str == 1) $
-                      set (lbl env) [ labelText := case hib of
+                      set label [ labelText := case hib of
                         H -> printf "%s: 0x%x" str (ord . head $ str) :: String
                         I -> printf "%s: %i"   str (ord . head $ str) :: String
                         B -> printf "%s: 0b%b" str (ord . head $ str) :: String
