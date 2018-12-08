@@ -54,8 +54,7 @@ data Env = Env { hib  :: TVar BaseConv
 type App = ReaderT Env IO ()
 
 setConv :: TVar BaseConv -> BaseConv -> IO ()
-setConv hib val =
-  atomically . writeTVar hib $ val
+setConv hib = atomically . writeTVar hib
 
 buildEnv :: IO Env
 buildEnv = 
