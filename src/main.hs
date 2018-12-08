@@ -72,7 +72,7 @@ handleEvents :: App
 handleEvents = ask >>= \env -> liftIO $ do
   -- Window
   on (win env) objectDestroy mainQuit
-  on (win env) deleteEvent $ liftIO mainQuit >> return False
+  on (win env) deleteEvent $ tryEvent . liftIO $ mainQuit
 
   -- Radio Button
   on (rbHex env) buttonReleaseEvent $ tryEvent . liftIO $ do
