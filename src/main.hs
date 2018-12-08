@@ -17,48 +17,95 @@
   Copyright 2018 Zachary Young
   -}
 
+{-# LANGUAGE LambdaCase #-}
+
 module Main (main) where
 
-import Graphics.UI.Gtk -- haskell-gtk, gtk3 on Hackage
-import Data.Hex        -- haskell-hex, hex on Hackage
+import Graphics.UI.Gtk                 -- haskell-gtk, gtk3 on Hackage
+import Data.Hex               ( hex )  -- haskell-hex, hex on Hackage
 
-import System.Glib.UTFString
-import Data.IORef
-import Data.Char
-import Control.Monad.Trans
+import System.Glib.UTFString  ( glibToString )
+import Data.Char              ( ord )
+import Control.Monad.Reader   ( lift
+                              , liftIO
+                              , runReaderT
+                              , ReaderT
+                              , ask
+                              )
+import Control.Monad          ( when )
+import Control.Concurrent.STM ( TVar
+                              , readTVarIO
+                              , atomically
+                              , modifyTVar'
+                              , writeTVar
+                              , newTVarIO
+                              )
 
 data HexOrInt = H | I
 
-keyPressed :: (LabelClass a) => a -> IORef HexOrInt -> EventM EKey Bool
-keyPressed lbl ref = tryEvent $ do
-  kn <- eventKeyName
-  hori <- liftIO $ readIORef ref
-  liftIO $ case glibToString kn of
-    "Return" -> mainQuit
-    str -> set lbl [ labelText := case hori of
-                     H -> str ++ ": " ++ "0x" ++ (hex $ str)
-                     I -> str ++ ": " ++ (show . ord . head $ str)
-                   ]
+data Env = Env { hi   :: TVar HexOrInt
+               , rbs  :: (RadioButton, RadioButton)
+               , lbl  :: Label
+               , win  :: Window
+               }
 
-radHexPressed :: (ToggleButtonClass a, ToggleButtonClass b)
-              => a -> b -> IORef HexOrInt -> EventM c Bool
-radHexPressed radHex radInt ref = tryEvent . liftIO $ do
-  hori <- readIORef ref
-  toggleButtonSetActive radHex True
-  toggleButtonSetActive radInt False
-  case hori of
-    H -> writeIORef ref I
-    I -> writeIORef ref H
+type App = ReaderT Env IO ()
 
-radIntPressed :: (ToggleButtonClass a, ToggleButtonClass b)
-              => a -> b -> IORef HexOrInt -> EventM c Bool
-radIntPressed radHex radInt ref = tryEvent . liftIO $ do
-  hori <- readIORef ref
-  toggleButtonSetActive radHex False
-  toggleButtonSetActive radInt True
-  case hori of
-    H -> writeIORef ref I
-    I -> writeIORef ref H
+swapHorI :: Env -> IO ()
+swapHorI env = readTVarIO (hi env)
+  >>= \case
+    H -> atomically . writeTVar (hi env) $ I
+    I -> atomically . writeTVar (hi env) $ H
+
+buildEnv :: IO Env
+buildEnv = 
+  builderNew
+  >>= \build  -> builderAddFromFile build                 "layout/layout.glade"
+  >>             builderGetObject build castToWindow      "win"
+  >>= \window -> builderGetObject build castToLabel       "lbl"
+  >>= \label  -> builderGetObject build castToRadioButton "rbHex"
+  >>= \rbHex  -> builderGetObject build castToRadioButton "rbInt"
+  >>= \rbInt  -> newTVarIO (H :: HexOrInt)
+  >>= \hori   -> return $ Env hori (rbHex, rbInt) label window
+
+handleEvents :: App 
+handleEvents = ask >>= \env -> liftIO $ do
+  -- Window
+  on (win env) objectDestroy mainQuit
+  on (win env) deleteEvent $ liftIO mainQuit >> return False
+
+  -- Radio Button
+  on (rbHex env) buttonReleaseEvent $ tryEvent . liftIO $ do
+    putStrLn "rbHex clicked"
+    toggleButtonSetActive (rbHex env) True
+    toggleButtonSetActive (rbInt env) False
+    swapHorI env
+
+  -- Radio Button
+  on (rbInt env) buttonReleaseEvent $ tryEvent . liftIO $ do
+    putStrLn "rbInt clicked"
+    toggleButtonSetActive (rbHex env) False
+    toggleButtonSetActive (rbInt env) True
+    swapHorI env
+
+  -- Keyboard 
+  on (win env) keyPressEvent $ do
+    kn  <- eventKeyName
+    tryEvent . liftIO $ do
+      putStrLn $ "key: " ++ glibToString kn
+      hori <- readTVarIO (hi env)
+      case glibToString kn of
+        "Return" -> mainQuit
+        str      -> when (length str == 1) $
+                      set (lbl env) [ labelText := case hori of
+                        H -> str ++ ": " ++ "0x" ++ (hex $ str)
+                        I -> str ++ ": " ++ (show . ord . head $ str)
+                      ]
+
+  return ()
+  where
+    rbHex = fst . rbs
+    rbInt = snd . rbs
 
 main :: IO ()
 main = do
@@ -67,30 +114,12 @@ main = do
 
   initGUI
 
-  -- Glade layout
-  build <- builderNew
-  builderAddFromFile build "layout/layout.glade"
-
-  -- Windows
-  win <- builderGetObject build castToWindow "win"
-
-  -- Label
-  lbl <- builderGetObject build castToLabel "lbl"
-
-  -- Radio Buttons
-  radHex <- builderGetObject build castToRadioButton "radHex"
-  radInt <- builderGetObject build castToRadioButton "radInt"
+  -- Build Environment
+  env <- buildEnv
+  let run = (flip runReaderT) env
 
   -- Events
-  on win objectDestroy mainQuit
-  on win deleteEvent $ liftIO mainQuit >> return False
-
-  -- Events: Radio Buttons
-  on radHex buttonReleaseEvent (radHexPressed radHex radInt hexOrInt)
-  on radInt buttonReleaseEvent (radIntPressed radHex radInt hexOrInt)
-
-  -- Events: Keyboard 
-  on win keyPressEvent (keyPressed lbl hexOrInt)
+  run handleEvents
 
   widgetShowAll win
   mainGUI
