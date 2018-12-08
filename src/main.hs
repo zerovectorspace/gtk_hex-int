@@ -101,6 +101,7 @@ handleEvents = ask >>= \env@(Env hori (rbHex,rbInt,rbBin) label window ) -> lift
       hib <- readTVarIO (hib env)
       case glibToString kn of
         "Return" -> mainQuit
+        "Escape" -> mainQuit
         str      -> when (length str == 1) $
                       set (lbl env) [ labelText := case hib of
                         H -> printf "%s: 0x%x" str (ord . head $ str) :: String
