@@ -52,11 +52,15 @@ data Env = Env { hi   :: TVar HexOrInt
 type App = ReaderT Env IO ()
 
 swapHorI :: Env -> IO ()
-swapHorI env = readTVarIO (hi env)
+swapHorI env =
+  readTVarIO (hi env)
   >>= \hori -> atomically . writeTVar (hi env)
   $ case hori of
     H -> I
     I -> H
+
+toggleRB :: RadioButton -> RadioButton -> IO ()
+toggleRB a b = toggleButtonSetActive a True >> toggleButtonSetActive b False
 
 buildEnv :: IO Env
 buildEnv = 
@@ -68,9 +72,6 @@ buildEnv =
   >>= \rbHex  -> builderGetObject build castToRadioButton "rbInt"
   >>= \rbInt  -> newTVarIO (H :: HexOrInt)
   >>= \hori   -> return $ Env hori (rbHex, rbInt) label window
-
-toggleRB :: RadioButton -> RadioButton -> IO ()
-toggleRB a b = toggleButtonSetActive a True >> toggleButtonSetActive b False
 
 handleEvents :: App 
 handleEvents = ask >>= \env -> liftIO $ do
