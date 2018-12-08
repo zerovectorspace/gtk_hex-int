@@ -14,6 +14,7 @@ dependencies:
 - gtk3
 - glib
 - mtl
+- stm
 
 library:
   source-dirs: src
