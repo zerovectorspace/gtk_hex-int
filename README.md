@@ -1,11 +1,10 @@
-# Keynames to Hex or Int
+# Keynames to Hexidecimal, Decimal, or Binary
 
-Convert keynames to hexidecimal or integer. Uses Haskell and Gtk with Glade layout files.
+Convert letters and numbers to hexidecimal, decimal, or binary. Uses Haskell and Gtk with Glade layout files.
 
 ## Prerequisites
 
 * [gtk3](http://hackage.haskell.org/package/gtk3) - REQUIRED
-* [hex](http://hackage.haskell.org/package/hex) - REQUIRED
 * [glade](https://glade.gnome.org/) - OPTIONAL - to edit the layout file
 
 ## Run
