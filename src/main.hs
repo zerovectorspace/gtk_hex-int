@@ -22,8 +22,8 @@
 module Main (main) where
 
 import Graphics.UI.Gtk                 -- haskell-gtk, gtk3 on Hackage
-import Data.Hex               ( hex )  -- haskell-hex, hex on Hackage
 
+import Text.Printf
 import System.Glib.UTFString  ( glibToString )
 import Data.Char              ( ord )
 import Control.Monad.Reader   ( lift
@@ -41,26 +41,21 @@ import Control.Concurrent.STM ( TVar
                               , newTVarIO
                               )
 
-data HexOrInt = H | I
+data BaseConv = H | I | B
 
-data Env = Env { hi   :: TVar HexOrInt
-               , rbs  :: (RadioButton, RadioButton)
+type RadioButtons = (RadioButton,RadioButton,RadioButton)
+
+data Env = Env { hib  :: TVar BaseConv
+               , rbs  :: RadioButtons
                , lbl  :: Label
                , win  :: Window
                }
 
 type App = ReaderT Env IO ()
 
-swapHorI :: Env -> IO ()
-swapHorI env =
-  readTVarIO (hi env)
-  >>= \hori -> atomically . writeTVar (hi env)
-  $ case hori of
-    H -> I
-    I -> H
-
-toggleRB :: RadioButton -> RadioButton -> IO ()
-toggleRB a b = toggleButtonSetActive a True >> toggleButtonSetActive b False
+setConv :: Env -> BaseConv -> IO ()
+setConv env val =
+  atomically . writeTVar (hib env) $ val
 
 buildEnv :: IO Env
 buildEnv = 
@@ -70,45 +65,50 @@ buildEnv =
   >>= \window -> builderGetObject build castToLabel       "lbl"
   >>= \label  -> builderGetObject build castToRadioButton "rbHex"
   >>= \rbHex  -> builderGetObject build castToRadioButton "rbInt"
-  >>= \rbInt  -> newTVarIO (H :: HexOrInt)
-  >>= \hori   -> return $ Env hori (rbHex, rbInt) label window
+  >>= \rbInt  -> builderGetObject build castToRadioButton "rbBin"
+  >>= \rbBin  -> newTVarIO (H :: BaseConv)
+  >>= \hori   -> return $ Env hori (rbHex,rbInt,rbBin) label window
 
 handleEvents :: App 
-handleEvents = ask >>= \env -> liftIO $ do
+handleEvents = ask >>= \env@(Env hori (rbHex,rbInt,rbBin) label window ) -> liftIO $ do
   -- Window
-  on (win env) objectDestroy mainQuit
-  on (win env) deleteEvent $ tryEvent . liftIO $ mainQuit
+  on window objectDestroy mainQuit
+  on window deleteEvent $ tryEvent . liftIO $ mainQuit
 
   -- Radio Button
-  on (rbHex env) buttonReleaseEvent $ tryEvent . liftIO $ do
+  on rbHex buttonReleaseEvent $ tryEvent . liftIO $ do
     putStrLn "rbHex clicked"
-    toggleRB (rbHex env) (rbInt env)
-    swapHorI env
+    toggleButtonSetActive rbHex True
+    setConv env H
 
   -- Radio Button
-  on (rbInt env) buttonReleaseEvent $ tryEvent . liftIO $ do
+  on rbInt buttonReleaseEvent $ tryEvent . liftIO $ do
     putStrLn "rbInt clicked"
-    toggleRB (rbInt env) (rbHex env)
-    swapHorI env
+    toggleButtonSetActive rbInt True
+    setConv env I
+
+  -- Radio Button
+  on rbBin buttonReleaseEvent $ tryEvent . liftIO $ do
+    putStrLn "rbBin clicked"
+    toggleButtonSetActive rbBin True
+    setConv env B
 
   -- Keyboard 
-  on (win env) keyPressEvent $ do
+  on window keyPressEvent $ do
     kn  <- eventKeyName
     tryEvent . liftIO $ do
       putStrLn $ "key: " ++ glibToString kn
-      hori <- readTVarIO (hi env)
+      hib <- readTVarIO (hib env)
       case glibToString kn of
         "Return" -> mainQuit
         str      -> when (length str == 1) $
-                      set (lbl env) [ labelText := case hori of
-                        H -> str ++ ": " ++ "0x" ++ (hex $ str)
-                        I -> str ++ ": " ++ (show . ord . head $ str)
+                      set (lbl env) [ labelText := case hib of
+                        H -> printf "%s: 0x%x" str (ord . head $ str) :: String
+                        I -> printf "%s: %i"   str (ord . head $ str) :: String
+                        B -> printf "%s: 0b%b" str (ord . head $ str) :: String
                       ]
 
   return ()
-  where
-    rbHex = fst . rbs
-    rbInt = snd . rbs
 
 main :: IO ()
 main =
