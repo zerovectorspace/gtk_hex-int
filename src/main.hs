@@ -68,6 +68,9 @@ buildEnv =
   >>= \rbInt  -> newTVarIO (H :: HexOrInt)
   >>= \hori   -> return $ Env hori (rbHex, rbInt) label window
 
+toggleRB :: RadioButton -> RadioButton -> IO ()
+toggleRB a b = toggleButtonSetActive a True >> toggleButtonSetActive b False
+
 handleEvents :: App 
 handleEvents = ask >>= \env -> liftIO $ do
   -- Window
@@ -77,15 +80,13 @@ handleEvents = ask >>= \env -> liftIO $ do
   -- Radio Button
   on (rbHex env) buttonReleaseEvent $ tryEvent . liftIO $ do
     putStrLn "rbHex clicked"
-    toggleButtonSetActive (rbHex env) True
-    toggleButtonSetActive (rbInt env) False
+    toggleRB (rbHex env) (rbInt env)
     swapHorI env
 
   -- Radio Button
   on (rbInt env) buttonReleaseEvent $ tryEvent . liftIO $ do
     putStrLn "rbInt clicked"
-    toggleButtonSetActive (rbHex env) False
-    toggleButtonSetActive (rbInt env) True
+    toggleRB (rbInt env) (rbHex env)
     swapHorI env
 
   -- Keyboard 
@@ -108,18 +109,19 @@ handleEvents = ask >>= \env -> liftIO $ do
     rbInt = snd . rbs
 
 main :: IO ()
-main = do
-  -- RadioButton State
-  hexOrInt <- newIORef H
-
+main =
+  -- Intialize Gtk
   initGUI
 
-  -- Build Environment
-  env <- buildEnv
-  let run = (flip runReaderT) env
+  -- Build GUI & Environment
+  >> buildEnv >>= \env ->
+  let run = (flip runReaderT) env in
 
   -- Events
   run handleEvents
 
-  widgetShowAll win
-  mainGUI
+  -- Show Window
+  >> widgetShowAll (win env)
+
+  -- Main Event Loop
+  >> mainGUI
