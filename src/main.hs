@@ -53,9 +53,10 @@ type App = ReaderT Env IO ()
 
 swapHorI :: Env -> IO ()
 swapHorI env = readTVarIO (hi env)
-  >>= \case
-    H -> atomically . writeTVar (hi env) $ I
-    I -> atomically . writeTVar (hi env) $ H
+  >>= \hori -> atomically . writeTVar (hi env)
+  $ case hori of
+    H -> I
+    I -> H
 
 buildEnv :: IO Env
 buildEnv = 
